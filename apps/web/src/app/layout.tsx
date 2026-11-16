@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Playfair_Display } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth';
 import { SITE } from '@/lib/site';
@@ -9,7 +9,6 @@ import Header from '@/components/Header';
 import JsonLd from '@/components/JsonLd';
 
 const inter = Inter({ subsets: ['latin'], display: 'swap', variable: '--font-inter' });
-const playfair = Playfair_Display({ subsets: ['latin'], display: 'swap', variable: '--font-playfair', weight: ['600', '700'] });
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
@@ -63,7 +62,7 @@ const orgLd = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-IN" className={`${inter.variable} ${playfair.variable}`}>
+    <html lang="en-IN" className={inter.variable}>
       <head>
         <noscript><style>{`.reveal{opacity:1!important;transform:none!important}`}</style></noscript>
       </head>

@@ -20,16 +20,20 @@
   --on-dark: #ffffff;
   --on-dark-2: #c3cfdd;
 
-  --font-head: var(--font-playfair), Georgia, "Times New Roman", serif;
-  --font-body: var(--font-inter), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-head: -apple-system, BlinkMacSystemFont, "SF Pro Display", var(--font-inter), system-ui, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", var(--font-inter), system-ui, "Segoe UI", Roboto, sans-serif;
 
-  --r-sm: 8px;
-  --r: 14px;
-  --r-lg: 20px;
-  --shadow: 0 1px 2px rgba(15, 42, 74, 0.06), 0 8px 24px -12px rgba(15, 42, 74, 0.18);
-  --shadow-lg: 0 24px 48px -20px rgba(15, 42, 74, 0.35);
-  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --section: clamp(56px, 8vw, 96px);
+  --r-sm: 12px;
+  --r: 18px;
+  --r-lg: 24px;
+  --r-pill: 980px;
+  --hairline: rgba(15, 42, 74, 0.06);
+  --shadow: 0 1px 2px rgba(15, 42, 74, 0.04), 0 4px 16px rgba(15, 42, 74, 0.06);
+  --shadow-lg: 0 2px 4px rgba(15, 42, 74, 0.04), 0 20px 50px -12px rgba(15, 42, 74, 0.18);
+  --ease: cubic-bezier(0.28, 0.11, 0.32, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur: 0.5s;
+  --section: clamp(64px, 9vw, 120px);
   --header-h: 68px;
 }
 
@@ -59,16 +63,18 @@ h4 {
   font-family: var(--font-head);
   color: var(--navy);
   margin: 0 0 0.5em;
-  line-height: 1.15;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.022em;
 }
 h1 {
-  font-size: clamp(2.4rem, 6vw, 4.2rem);
+  font-size: clamp(2.6rem, 6.5vw, 4.8rem);
   line-height: 1.05;
+  letter-spacing: -0.035em;
 }
 h2 {
-  font-size: clamp(1.75rem, 3.6vw, 2.6rem);
+  font-size: clamp(1.85rem, 3.8vw, 2.8rem);
+  line-height: 1.05;
 }
 h3 {
   font-size: 1.2rem;
@@ -249,28 +255,31 @@ button {
   justify-content: center;
   gap: 8px;
   min-height: 44px;
-  padding: 10px 20px;
-  border-radius: var(--r-sm);
+  padding: 10px 24px;
+  border-radius: var(--r-pill);
   border: 1.5px solid var(--navy);
   background: transparent;
   color: var(--navy);
   font-weight: 600;
   font-size: 0.96rem;
   line-height: 1.2;
+  letter-spacing: -0.01em;
   cursor: pointer;
   text-align: center;
   transition:
-    background-color 0.2s,
-    color 0.2s,
-    border-color 0.2s,
-    box-shadow 0.2s,
-    transform 0.2s var(--ease);
+    background-color 0.3s var(--ease),
+    color 0.3s var(--ease),
+    border-color 0.3s var(--ease),
+    box-shadow 0.3s var(--ease),
+    transform 0.3s var(--ease);
 }
 .btn:hover {
   background: rgba(15, 42, 74, 0.06);
+  transform: translateY(-1px);
 }
 .btn:active {
-  transform: translateY(1px);
+  transform: scale(0.97);
+  transition-duration: 0.15s;
 }
 .btn svg {
   width: 18px;
@@ -324,15 +333,16 @@ button {
 .btn-link:hover {
   background: none;
   color: var(--gold-ink);
+  transform: none;
 }
 .btn-sm {
   min-height: 36px;
-  padding: 6px 12px;
+  padding: 6px 16px;
   font-size: 0.86rem;
 }
 .btn-lg {
   min-height: 52px;
-  padding: 14px 26px;
+  padding: 14px 32px;
   font-size: 1.02rem;
 }
 .btn-block {
@@ -354,11 +364,11 @@ button {
 .more svg {
   width: 16px;
   height: 16px;
-  transition: transform 0.25s var(--ease);
+  transition: transform 0.4s var(--ease);
 }
 .more:hover svg,
 .lift:hover .more svg {
-  transform: translateX(3px);
+  transform: translateX(4px);
 }
 
 /* ---------- header ---------- */
@@ -366,12 +376,19 @@ header.top {
   position: sticky;
   top: 0;
   z-index: 60;
-  background: var(--navy);
+  /* Frosted glass. Alpha stays ≥ .85 so --on-dark-2 nav text keeps ≥ 4.5:1 over white content. */
+  background: rgba(15, 42, 74, 0.85);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
   color: #fff;
-  transition: box-shadow 0.3s var(--ease);
+  border-bottom: 1px solid transparent;
+  transition:
+    background-color 0.5s var(--ease),
+    border-color 0.5s var(--ease);
 }
 header.top.scrolled {
-  box-shadow: 0 6px 24px -10px rgba(0, 0, 0, 0.45);
+  background: rgba(15, 42, 74, 0.92);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 .nav {
   display: flex;
@@ -384,8 +401,9 @@ header.top.scrolled {
   align-items: center;
   gap: 10px;
   font-family: var(--font-head);
-  font-size: 1.45rem;
-  font-weight: 700;
+  font-size: 1.4rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
   color: #fff;
   flex: none;
 }
@@ -410,19 +428,27 @@ header.top.scrolled {
   color: var(--on-dark-2);
   position: relative;
   white-space: nowrap;
+  transition: color 0.3s var(--ease);
 }
 .links .nl:hover,
 .links .nl.active {
   color: #fff;
 }
-.links .nl.active::after {
+.links .nl::after {
   content: "";
   position: absolute;
   left: 10px;
   right: 10px;
   bottom: 2px;
   height: 2px;
+  border-radius: 2px;
   background: var(--gold);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.45s var(--ease);
+}
+.links .nl.active::after {
+  transform: scaleX(1);
 }
 .nav-actions {
   display: flex;
@@ -493,13 +519,13 @@ header.top.scrolled {
 .hero h1 {
   color: #fff;
   margin-bottom: 0.2em;
-  letter-spacing: 0.01em;
 }
 .hero .sub {
   font-family: var(--font-head);
   font-size: clamp(1.3rem, 2.6vw, 1.9rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
   color: var(--gold);
-  font-style: italic;
   margin: 0 0 18px;
 }
 .hero .for {
@@ -554,20 +580,23 @@ header.top.scrolled {
   display: flex;
   gap: 14px;
   align-items: flex-start;
-  padding: 20px;
+  padding: 22px;
   border-radius: var(--r);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.07);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: #fff;
+  will-change: transform;
   transition:
-    background-color 0.25s,
-    border-color 0.25s,
-    transform 0.3s var(--ease);
+    background-color 0.5s var(--ease),
+    border-color 0.5s var(--ease),
+    transform 0.5s var(--ease);
 }
 .hl:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(201, 162, 39, 0.6);
-  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(201, 162, 39, 0.5);
+  transform: translateY(-6px) scale(1.02);
 }
 .hl h3 {
   color: #fff;
@@ -587,9 +616,9 @@ header.top.scrolled {
 .card {
   position: relative;
   background: #fff;
-  border: 1px solid var(--line);
+  border: 1px solid var(--hairline);
   border-radius: var(--r);
-  padding: clamp(18px, 2.4vw, 26px);
+  padding: clamp(20px, 2.6vw, 28px);
   box-shadow: var(--shadow);
 }
 .sec.alt .card.flat,
@@ -599,17 +628,39 @@ header.top.scrolled {
 .card > :last-child {
   margin-bottom: 0;
 }
+/* Hover lift. The bigger shadow (::after) and the sheen (::before) fade in with opacity only,
+   so the browser never repaints box-shadow while animating. */
 .lift {
   display: block;
-  transition:
-    transform 0.3s var(--ease),
-    box-shadow 0.3s var(--ease),
-    border-color 0.3s;
+  position: relative;
+  isolation: isolate;
+  will-change: transform;
+  transition: transform var(--dur) var(--ease);
+}
+.lift::before,
+.lift::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+.lift::after {
+  z-index: -1;
+  box-shadow: var(--shadow-lg);
+}
+.lift::before {
+  z-index: 2;
+  background: radial-gradient(120% 80% at 50% 0%, rgba(255, 255, 255, 0.18), transparent 60%);
 }
 .lift:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
-  border-color: var(--line-2);
+  transform: translateY(-6px) scale(1.02);
+}
+.lift:hover::before,
+.lift:hover::after {
+  opacity: 1;
 }
 .icon-badge {
   display: inline-grid;
@@ -891,8 +942,10 @@ ul.checks svg {
 }
 .plan .price {
   font-family: var(--font-head);
-  font-size: clamp(1.8rem, 3vw, 2.2rem);
-  font-weight: 700;
+  font-size: clamp(1.9rem, 3.2vw, 2.4rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
   color: var(--navy);
   line-height: 1.05;
 }
@@ -915,21 +968,26 @@ ul.checks svg {
   margin-top: auto;
 }
 .plan.best {
-  border: 2px solid var(--gold);
-  box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(201, 162, 39, 0.45);
+  box-shadow:
+    0 0 0 4px rgba(201, 162, 39, 0.1),
+    0 20px 50px -16px rgba(201, 162, 39, 0.4),
+    var(--shadow);
 }
 .plan .ribbon {
   position: absolute;
-  top: -12px;
-  right: 16px;
+  top: -13px;
+  right: 18px;
+  z-index: 3;
   background: var(--gold);
   color: var(--navy);
   font-size: 0.72rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 4px 10px;
-  border-radius: 99px;
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  box-shadow: 0 4px 12px -4px rgba(201, 162, 39, 0.6);
 }
 .plan-note {
   margin-top: 18px;
@@ -1005,11 +1063,11 @@ ul.checks svg {
 /* ---------- tabs ---------- */
 .tabs {
   display: inline-flex;
-  gap: 4px;
+  gap: 2px;
   padding: 4px;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 99px;
+  background: rgba(15, 42, 74, 0.06);
+  border: 0;
+  border-radius: var(--r-pill);
   margin-bottom: 24px;
   max-width: 100%;
   overflow-x: auto;
@@ -1017,17 +1075,27 @@ ul.checks svg {
 .tab {
   border: 0;
   background: transparent;
-  padding: 9px 18px;
-  border-radius: 99px;
+  padding: 9px 20px;
+  border-radius: var(--r-pill);
   font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--text-2);
   cursor: pointer;
   white-space: nowrap;
   min-height: 40px;
+  transition:
+    background-color 0.4s var(--ease),
+    color 0.4s var(--ease),
+    box-shadow 0.4s var(--ease),
+    transform 0.15s var(--ease);
+}
+.tab:active {
+  transform: scale(0.97);
 }
 .tab[aria-selected="true"] {
   background: var(--navy);
   color: #fff;
+  box-shadow: 0 1px 2px rgba(15, 42, 74, 0.12), 0 4px 12px -2px rgba(15, 42, 74, 0.25);
 }
 .tab:hover:not([aria-selected="true"]) {
   color: var(--navy);
@@ -1040,16 +1108,22 @@ ul.checks svg {
   height: 100%;
 }
 .post .cover {
-  margin: calc(-1 * clamp(18px, 2.4vw, 26px)) calc(-1 * clamp(18px, 2.4vw, 26px)) 16px;
+  margin: calc(-1 * clamp(20px, 2.6vw, 28px)) calc(-1 * clamp(20px, 2.6vw, 28px)) 16px;
   aspect-ratio: 16/8;
   background: var(--bg-alt);
   border-radius: var(--r) var(--r) 0 0;
   overflow: hidden;
 }
-.post .cover img {
+.post .cover img,
+.player img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.7s var(--ease);
+}
+.lift:hover .cover img,
+.vid:hover .player img {
+  transform: scale(1.06);
 }
 .post h3 {
   font-size: 1.15rem;
@@ -1306,8 +1380,9 @@ ul.checks svg {
 }
 .faq-item {
   background: #fff;
-  border: 1px solid var(--line);
+  border: 1px solid var(--hairline);
   border-radius: var(--r);
+  box-shadow: var(--shadow);
   overflow: hidden;
 }
 .faq-item h3 {
@@ -1336,19 +1411,26 @@ ul.checks svg {
   width: 20px;
   height: 20px;
   color: var(--gold-ink);
-  transition: transform 0.3s var(--ease);
+  transition: transform 0.5s var(--ease);
 }
 .faq-q[aria-expanded="true"] svg {
   transform: rotate(45deg);
 }
+/* grid-template-rows is the one non-transform animation kept: it is the only way to animate to auto height. */
 .faq-a {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 0.3s var(--ease);
+  transition: grid-template-rows 0.5s var(--ease);
 }
 .faq-a > div {
   overflow: hidden;
-  transition: visibility 0.3s;
+  opacity: 0;
+  transition:
+    visibility 0.5s,
+    opacity 0.4s var(--ease);
+}
+.faq-a.open > div {
+  opacity: 1;
 }
 .faq-a:not(.open) > div {
   visibility: hidden; /* closed answers are hidden from screen readers and keyboard focus */
@@ -1436,15 +1518,15 @@ textarea {
   width: 100%;
   min-height: 46px;
   padding: 11px 14px;
-  border-radius: var(--r-sm);
-  border: 1.5px solid var(--line-2);
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
   background: #fff;
   color: var(--text);
   font: inherit;
   font-size: 0.98rem;
   transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
+    border-color 0.3s var(--ease),
+    box-shadow 0.3s var(--ease);
 }
 textarea {
   min-height: 0;
@@ -1455,7 +1537,7 @@ select:focus,
 textarea:focus {
   outline: none;
   border-color: var(--navy);
-  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.45);
+  box-shadow: 0 0 0 4px rgba(201, 162, 39, 0.25);
 }
 input[aria-invalid="true"],
 select[aria-invalid="true"],
@@ -1491,7 +1573,7 @@ input[type="radio"] {
   display: grid;
   place-items: center;
   padding: 0 12px;
-  border: 1.5px solid var(--line-2);
+  border: 1px solid var(--line-2);
   border-right: 0;
   border-radius: var(--r-sm) 0 0 var(--r-sm);
   background: var(--bg-alt);
@@ -2127,9 +2209,10 @@ footer.site a:hover {
 .reveal {
   opacity: 0;
   transform: translateY(24px);
+  /* Stagger comes from Reveal's `delay` prop, which sets --d on each wrapped card. */
   transition:
-    opacity 0.7s var(--ease),
-    transform 0.7s var(--ease);
+    opacity 0.8s var(--ease),
+    transform 0.8s var(--ease);
   transition-delay: var(--d, 0ms);
 }
 .reveal.in {
@@ -2210,26 +2293,6 @@ footer.site a:hover {
     transform: rotate(360deg);
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-  .reveal {
-    opacity: 1;
-    transform: none;
-  }
-  .wave-draw path {
-    stroke-dashoffset: 0;
-  }
-}
-
 /* ---------- print (invoices) ---------- */
 @media print {
   header.top,
@@ -2373,18 +2436,19 @@ footer.site a:hover {
     flex-direction: column;
     align-items: stretch;
     gap: 0;
-    background: var(--navy);
+    /* near-solid: a backdrop-filter nested inside the frosted header does not render in Chromium */
+    background: rgba(15, 42, 74, 0.98);
     padding: 8px clamp(16px, 3vw, 28px) 18px;
-    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 16px 32px -12px rgba(0, 0, 0, 0.5);
     opacity: 0;
-    transform: translateY(-6px);
+    transform: translateY(-12px);
     visibility: hidden;
     pointer-events: none;
     transition:
-      opacity 0.25s var(--ease),
-      transform 0.25s var(--ease),
-      visibility 0.25s;
+      opacity 0.4s var(--ease),
+      transform 0.4s var(--ease),
+      visibility 0.4s;
     max-height: calc(100vh - var(--header-h));
     overflow-y: auto;
   }
@@ -2440,5 +2504,44 @@ footer.site a:hover {
     left: 16px;
     right: 16px;
     max-width: none;
+  }
+}
+
+/* ---------- reduced motion (kept last so it wins) ---------- */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+  .reveal,
+  .reveal.in {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .btn:hover,
+  .btn:active,
+  .tab:active,
+  .lift:hover,
+  .hl:hover,
+  .lift:hover .cover img,
+  .vid:hover .player img,
+  .player .play:hover span,
+  .lift:hover .more svg,
+  .more:hover svg {
+    transform: none !important;
+  }
+  .lift,
+  .hl {
+    will-change: auto;
+  }
+  .wave-draw path {
+    stroke-dashoffset: 0;
   }
 }
