@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>waves4u — System Architecture & Codebase Guide</title>
+<style>
+  @page {
+    size: A4;
+    margin: 18mm 16mm;
+    @bottom-right {
+      content: counter(page);
+    }
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+    color: #1e293b;
+    max-width: 900px;
+    margin: 0 auto;
+    font-size: 10pt;
+  }
+  h1 {
+    color: #0b47a8;
+    border-bottom: 2px solid #0b47a8;
+    padding-bottom: 6px;
+    font-size: 20pt;
+    margin-top: 0;
+  }
+  h2 {
+    color: #1e3a8a;
+    border-bottom: 1px solid #cbd5e1;
+    padding-bottom: 4px;
+    font-size: 14pt;
+    margin-top: 22px;
+    page-break-after: avoid;
+  }
+  h3 {
+    color: #1e40af;
+    font-size: 12pt;
+    margin-top: 16px;
+    page-break-after: avoid;
+  }
+  h4 {
+    color: #334155;
+    font-size: 10.5pt;
+    margin-top: 12px;
+    page-break-after: avoid;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 9pt;
+    page-break-inside: avoid;
+  }
+  th {
+    background-color: #f1f5f9;
+    color: #0f172a;
+    text-align: left;
+    padding: 7px 10px;
+    border: 1px solid #cbd5e1;
+    font-weight: 600;
+  }
+  td {
+    border: 1px solid #cbd5e1;
+    padding: 7px 10px;
+  }
+  tr:nth-child(even) {
+    background-color: #f8fafc;
+  }
+  code {
+    background-color: #f1f5f9;
+    color: #0b47a8;
+    padding: 1.5px 4px;
+    border-radius: 4px;
+    font-family: "SFMono-Regular", Consolas, Monaco, monospace;
+    font-size: 8.5pt;
+  }
+  pre {
+    background-color: #0f172a;
+    color: #f8fafc;
+    padding: 12px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 8.5pt;
+    line-height: 1.4;
+    page-break-inside: avoid;
+  }
+  pre code {
+    background: none;
+    color: inherit;
+    padding: 0;
+  }
+  li {
+    margin-bottom: 4px;
+  }
+  hr {
+    border: none;
+    border-top: 1px solid #e2e8f0;
+    margin: 20px 0;
+  }
+  p {
+    margin: 6px 0;
+  }
+</style>
+</head>
+<body>
+<h1>waves4u — Complete Codebase & Database Architecture Guide</h1>
+<p>This guide explains <strong>every folder</strong>, <strong>every file</strong>, <strong>how they talk to each other</strong>, and <strong>how the database tracks everything</strong> in the <code>waves4u</code> platform in clear, simple language.</p>
+<hr/>
+<h2>1. High-Level Overview: What is <code>waves4u</code>?</h2>
+<p><code>waves4u</code> is a financial advisory and research platform focused on <strong>Elliott Wave technical analysis</strong>. It is built for a SEBI-registered research analyst to provide:</p>
+<p>1. <strong>Public content</strong>: Educational articles, video analyses from YouTube, and teaser wave counts.</p>
+<p>2. <strong>Paid Premium Club</strong>: Deep wave counts, exact trade levels (support, resistance, target, stop loss), complete weekly blogs, and live mentorship sessions.</p>
+<p>3. <strong>Razorpay Payments</strong>: Integrated Indian checkout (UPI, Cards, Netbanking) with automated 18% GST calculation, sequential invoice generation, and subscription tracking.</p>
+<p>4. <strong>Admin Dashboard</strong>: For publishing analyses, scheduling blogs, managing members, and auditing every administrative action.</p>
+<p>5. <strong>Background Worker</strong>: A scheduled task runner that syncs YouTube videos, publishes scheduled blog posts, and expires overdue subscriptions.</p>
+<hr/>
+<h2>2. System Architecture & Data Flow</h2>
+<pre><code>[ Visitor / Member Browser ]
+            │
+            ▼ (port 3000)
+    Frontend: Next.js (apps/web)
+            │
+            │  Rewrites all /api/* requests
+            ▼ (port 4000)
+    Backend: Express API (apps/api) ◄────── Background Worker (apps/api/src/worker.ts)
+            │                                  (runs cron jobs for YouTube sync,
+            ▼                                   blog publishing &amp; subscription expiry)
+    MongoDB (Replica Set: rs0)</code></pre>
+<h3>The Key Communication Secrets</h3>
+<p>1. <strong>No CORS Issues (Next.js Proxy)</strong>: The browser only connects to <code>http://localhost:3000</code>. In <code>apps/web/next.config.mjs</code>, any request starting with <code>/api/</code> is secretly forwarded under the hood to the backend at <code>http://localhost:4000/api/</code>. This means authentication cookies are <strong>first-party</strong>, immune to third-party cookie blocking.</p>
+<p>2. <strong>Server-Side Paywall</strong>: Security does not happen by hiding buttons in React. In <code>apps/api/src/routes/content.ts</code>, if a visitor is not a paid member, sensitive fields (<code>levels</code>, blog <code>body</code>, session <code>joinLink</code>) are stripped completely out of the response <strong>before leaving the server</strong>. Even inspecting network packets or page source cannot reveal locked data.</p>
+<p>3. <strong>Idempotent Payments</strong>: Payment fulfillment is atomic and runs inside a MongoDB transaction. If both the browser verification and the Razorpay server webhook hit the backend at the same time, the system guarantees only one activates the subscription and no duplicate invoice or wasted days occur.</p>
+<hr/>
+<h2>3. Directory & File Breakdown</h2>
+<h3>Root Directory Files</h3>
+<table><thead><tr><th>File</th><th>Purpose in Simple Words</th></tr></thead><tbody>
+<tr><td><code>package.json</code></td><td>Top-level shortcut file. Allows running one command from the project root (e.g. <code>npm run setup</code>, <code>npm run dev:api</code>, <code>npm run dev:web</code>) to operate both apps together without <code>cd</code>-ing into subfolders.</td></tr>
+<tr><td><code>docker-compose.yml</code></td><td>Production-ready container orchestration file. Runs MongoDB (with a single-node replica set <code>rs0</code> required for transactions), the API server, the worker, and the Next.js frontend in Docker containers.</td></tr>
+<tr><td><code>README.md</code></td><td>General project documentation explaining how to launch the project in 4 terminal tabs and test the user flow from free sign-up to premium upgrade.</td></tr>
+</tbody></table>
+<hr/>
+<h3>Backend: <code>apps/api/</code></h3>
+<p>The backend is built with <strong>Node.js, Express, TypeScript, and Mongoose (MongoDB)</strong>.</p>
+<h4>Configuration & Server Entrypoints</h4>
+<li><strong><code>src/config.ts</code></strong>:</li>
+<li>Uses <code>zod</code> to validate environment variables upon startup (like <code>PORT</code>, <code>MONGO_URI</code>, <code>JWT_ACCESS_SECRET</code>, <code>JWT_REFRESH_SECRET</code>, <code>RAZORPAY_KEY_ID</code>, etc.). If a required environment secret is missing or too short, the server refuses to start with an immediate error message.</li>
+<li><strong><code>src/db.ts</code></strong>:</li>
+<li>Initializes the Mongoose connection to MongoDB. Configures <code>strictQuery: true</code> to prevent accidental query injections.</li>
+<li><strong><code>src/app.ts</code></strong>:</li>
+<li>Factory function <code>createApp()</code>. Configures security middleware (<code>helmet</code>, <code>cors</code>, <code>express-rate-limit</code>), mounts cookie parsing, and attaches route handlers.</li>
+<li><strong>Crucial detail</strong>: Mounts <code>/api/payments/webhook</code> with <code>express.raw()</code> <strong>before</strong> <code>express.json()</code>, because cryptographic signature validation requires the exact raw byte payload sent by Razorpay.</li>
+<li><strong><code>src/server.ts</code></strong>:</li>
+<li>Connects to the database and starts listening on the configured port (<code>4000</code>). Handles graceful shutdown signals (<code>SIGINT</code>, <code>SIGTERM</code>) to cleanly disconnect from MongoDB.</li>
+<li><strong><code>src/worker.ts</code></strong>:</li>
+<li>A background process driven by <code>node-cron</code>:</li>
+<li><strong>Every 5 minutes</strong>: Publishes scheduled blog posts whose <code>publishAt</code> time has arrived.</li>
+<li><strong>Every 30 minutes</strong>: Syncs recent YouTube uploads using the public RSS feed (no paid API key required).</li>
+<li><strong>Every hour</strong>: Marks expired subscriptions as <code>status: 'expired'</code>.</li>
+<h4>Data Models (<code>src/models/index.ts</code>)</h4>
+<p>Defines all MongoDB schemas and Mongoose models in one cohesive place. (Detailed in Section 4).</p>
+<h4>Middlewares (<code>src/middleware/</code>)</h4>
+<li><strong><code>auth.ts</code></strong>:</li>
+<li><code>resolveUser(req)</code>: Inspects incoming HTTP-only cookies (<code>at</code> = access token). If valid, looks up the user in MongoDB and checks if they have an active subscription or admin role to assign <code>req.user.isPremium</code>.</li>
+<li><code>authenticate</code>: Throws a 401 error if the user is not logged in.</li>
+<li><code>optionalAuth</code>: Allows both guests and logged-in users to proceed; attaches user info if present so routes can decide what content to show.</li>
+<li><code>requireRole('admin')</code>: Restricts administrative routes strictly to <code>admin</code> accounts.</li>
+<li><code>requirePremium</code>: Blocks free users from premium actions (like registering for mentorship workshops).</li>
+<li><strong><code>error.ts</code></strong>:</li>
+<li><code>notFound</code>: Standard 404 JSON response for unmapped endpoints.</li>
+<li><code>errorHandler</code>: Global catch-all error middleware. Converts <code>ZodError</code> validation failures into 400s, <code>AppError</code> into their respective status codes, and code 11000 duplicate keys into 409 Conflict.</li>
+<h4>Utility Functions (<code>src/utils/</code>)</h4>
+<li><strong><code>errors.ts</code></strong>:</li>
+<li>Defines the custom <code>AppError</code> class with HTTP status codes and a <code>wrap()</code> higher-order function that catches async promise rejections in Express routes and hands them to the error middleware.</li>
+<li><strong><code>money.ts</code></strong>:</li>
+<li><code>gstSplit(totalPaise)</code>: Calculates reverse 18% GST split on GST-inclusive prices using integer math to eliminate floating-point rounding errors.</li>
+<li><code>slugify(text)</code>: Converts post titles into URL-safe slugs (e.g., <code>Gold Wave 3</code> -> <code>gold-wave-3</code>).</li>
+<li><code>escapeRegex(string)</code>: Escapes special characters before injecting user search terms into MongoDB regexes.</li>
+<li><strong><code>signature.ts</code></strong>:</li>
+<li>Cryptographic helpers using Node's native <code>crypto</code>:</li>
+<li><code>verifyCheckout</code>: Verifies Razorpay checkout signatures (<code>orderId|paymentId</code>) using <code>crypto.timingSafeEqual</code> to prevent timing attacks.</li>
+<li><code>verifyWebhook</code>: Verifies Razorpay webhook request body signatures against <code>RAZORPAY_WEBHOOK_SECRET</code>.</li>
+<h4>Business Services (<code>src/services/</code>)</h4>
+<li><strong><code>token.ts</code></strong>:</li>
+<li>Issues and verifies dual JWT tokens:</li>
+<li><strong>Access Token (<code>at</code>)</strong>: Valid for 15 minutes, stored in an HttpOnly cookie.</li>
+<li><strong>Refresh Token (<code>rt</code>)</strong>: Valid for 7 days, contains a <code>tokenVersion</code> number (<code>tv</code>). If an admin blocks a user or the user clicks "Logout from all devices", <code>tokenVersion</code> is incremented in MongoDB, immediately invalidating all existing refresh tokens.</li>
+<li><strong><code>subscription.ts</code></strong>:</li>
+<li><code>fulfilPayment(orderId, paymentId)</code>: Idempotent transaction runner. Marks the payment as <code>paid</code>, generates a sequential invoice number (<code>W4U-YYYY-XXXXX</code>), and adds the subscription duration. If the user already has an active subscription, it <strong>stacks</strong> the extra days onto the current end date without wasting a single day.</li>
+<li><code>grantSubscription(userId, planCode, days)</code>: Allows an admin to manually award premium access to a user (e.g. for customer support or offline payment).</li>
+<li><code>expireSubscriptions()</code>: Batch updates expired subscriptions to <code>expired</code>.</li>
+<li><strong><code>razorpay.ts</code></strong>:</li>
+<li>Singleton wrapper that instantiates the Razorpay SDK client with API keys.</li>
+<li><strong><code>notifications.ts</code></strong>:</li>
+<li>Implements the <strong>Outbox Pattern</strong>. Instead of calling external email/SMS providers directly in HTTP requests (which can fail or slow down requests), it writes a pending notification into the <code>NotificationOutbox</code> collection.</li>
+<li><strong><code>youtube.ts</code></strong>:</li>
+<li>Reads YouTube's public XML RSS feed for the configured channel ID using <code>fast-xml-parser</code>, parses the video IDs and titles, and does a <code>bulkWrite</code> upsert into the <code>Video</code> collection.</li>
+<li><strong><code>audit.ts</code></strong>:</li>
+<li>Logs administrative actions (who did what, to which record, and with what parameters) into the <code>AuditLog</code> collection.</li>
+<h4>API Routes (<code>src/routes/</code>)</h4>
+<li><strong><code>auth.ts</code></strong>:</li>
+<li><code>POST /register</code>: Registers a new user with Argon2 password hashing and logs them in.</li>
+<li><code>POST /login</code>: Authenticates credentials with Argon2 and issues HTTP-only cookies. Rate-limited to 20 attempts per 15 minutes.</li>
+<li><code>POST /refresh</code>: Silently rotates the 15-minute access token using the 7-day refresh token.</li>
+<li><code>POST /logout</code>: Clears browser cookies.</li>
+<li><code>POST /logout-all</code>: Increments <code>tokenVersion</code> in the DB and clears cookies, booting the user out of every session on all devices.</li>
+<li><code>GET /me</code>: Strict endpoint returning the logged-in user profile or a 401.</li>
+<li><code>GET /session</code>: Friendly endpoint called on page loads. Always returns HTTP 200 (returning <code>{ user: null }</code> for guests), preventing noisy 401 errors in browser logs, and silently auto-renews expired access tokens.</li>
+<li><strong><code>payments.ts</code></strong>:</li>
+<li><code>GET /plans</code>: Returns active membership tiers.</li>
+<li><code>POST /order</code>: Creates a Razorpay order. The price is strictly looked up from MongoDB (preventing client-side tampering).</li>
+<li><code>POST /verify</code>: Fast-path verification called directly by the browser right after payment completes.</li>
+<li><code>POST /webhook</code>: Server-to-server webhook endpoint called by Razorpay. Source of truth for payment capture or failure.</li>
+<li><code>GET /mine</code>: Returns past payments and invoices for the logged-in member.</li>
+<li><strong><code>content.ts</code></strong>:</li>
+<li><code>GET /blog</code>: Lists published blog posts (teaser only).</li>
+<li><code>GET /blog/:slug</code>: Fetches a single blog post. If the visitor is not premium, the <code>body</code> is stripped out.</li>
+<li><code>GET /analysis</code>: Lists active Elliott Wave analyses. Strips <code>levels</code> for non-members.</li>
+<li><code>GET /analysis/:id</code>: Fetches a single analysis with paywall enforcement.</li>
+<li><code>GET /markets</code>: Lists available market symbols and asset categories.</li>
+<li><code>GET /videos</code>: Returns synced YouTube videos.</li>
+<li><code>GET /sessions</code>: Lists upcoming mentorship sessions. Strips <code>joinLink</code> for non-members.</li>
+<li><code>POST /sessions/:id/register</code>: Allows a premium member to book a seat in a live session (respecting session capacity).</li>
+<li><strong><code>admin.ts</code></strong>:</li>
+<li>Protected by <code>authenticate</code> and <code>requireRole('admin')</code>.</li>
+<li><code>GET /stats</code>: Aggregates total users, active premium members, published posts, and total collected revenue.</li>
+<li><code>GET /users</code>: Paginated search and filtering of all registered users.</li>
+<li><code>GET /users/:id</code>: Details of a specific user with their subscription and payment records.</li>
+<li><code>PATCH /users/:id/status</code>: Blocks or unblocks a user (blocking increments <code>tokenVersion</code> to immediately kill active sessions).</li>
+<li><code>POST /users/:id/grant</code>: Manually awards a subscription to a user.</li>
+<li><code>POST /blog</code> & <code>PATCH /blog/:id</code>: Creates, sanitizes HTML, schedules, or updates blog articles.</li>
+<li><code>POST /analysis</code>: Publishes a new Elliott Wave analysis.</li>
+<li><code>POST /analysis/:id/update</code>: Implements <strong>immutable versioning</strong>. Rather than overwriting an existing published analysis, this marks the previous one as <code>supersededBy</code> and creates a new document linked to the old one.</li>
+<li><code>POST /sessions</code>: Schedules a new mentorship session.</li>
+<li><code>PATCH /plans/:code</code>: Updates plan price or toggles active status.</li>
+<li><code>GET /audit</code>: Returns the administrative audit history.</li>
+<h4>Seed Scripts & Tests</h4>
+<li><strong><code>src/seed.ts</code></strong>: Idempotently seeds standard plans (<code>monthly</code>, <code>yearly</code>), default markets (Nifty 50, Gold, Silver, Crude Oil, USD/INR), and the initial admin user.</li>
+<li><strong><code>src/seed-demo.ts</code></strong>: Populates realistic mock data (demo analyses, blog posts, live workshops, videos) to preview the UI, with an <code>--clear</code> option (<code>npm run unseed:demo</code>) to clean it up.</li>
+<li><strong><code>test/core.test.ts</code></strong>: Automated unit tests verifying Razorpay HMAC verification, GST mathematical calculations, and slug generation.</li>
+<hr/>
+<h3>Frontend: <code>apps/web/</code></h3>
+<p>The frontend is built with <strong>Next.js 14 (App Router), React 18, and TypeScript</strong>. It uses pure, hand-crafted modern CSS in <code>src/app/globals.css</code> with zero third-party UI framework dependencies.</p>
+<h4>Root Configuration & Entrypoints</h4>
+<li><strong><code>next.config.mjs</code></strong>: Configures Next.js standalone output and sets up the rewrite rule mapping <code>/api/:path*</code> to <code>http://localhost:4000/api/:path*</code>.</li>
+<li><strong><code>src/app/globals.css</code></strong>: The complete styling system. Contains brand color tokens (<code>--navy</code>, <code>--blue</code>, <code>--yellow</code>, <code>--amber</code>), typography, custom 12-column Bento grid system (<code>.bento</code>, <code>.s4</code>, <code>.s8</code>, <code>.s12</code>), interactive card hover states (<code>.lift</code>), buttons, modal styles, and responsive breakpoints.</li>
+<li><strong><code>src/app/layout.tsx</code></strong>: Root layout wrapping the entire application in the <code>AuthProvider</code>, the cursor <code>Spotlight</code>, the universal <code>Header</code>, and the <code>Footer</code>.</li>
+<li><strong><code>src/app/template.tsx</code></strong>: Runs on page navigation to provide a clean CSS fade-in animation between route changes.</li>
+<h4>State & Communication Libraries (<code>src/lib/</code>)</h4>
+<li><strong><code>types.ts</code></strong>: TypeScript definitions for frontend entities (<code>Analysis</code>, <code>BlogItem</code>, <code>Video</code>, <code>Plan</code>, <code>Session</code>, <code>Me</code>) and helper formatting functions (<code>inr()</code> for Indian Rupee currency and <code>fmtDate()</code>).</li>
+<li><strong><code>server.ts</code></strong>:</li>
+<li><code>sget(path)</code>: Used in React Server Components. Performs server-side fetches directly to the API, forwarding the browser's incoming cookies so the backend can evaluate whether the visitor is premium before returning HTML.</li>
+<li><strong><code>client.ts</code></strong>:</li>
+<li><code>api(path, options)</code>: Used in React Client Components (forms, buttons, interactive dashboards). Sends client-side requests through the <code>/api</code> proxy. If an access token expired mid-session (401), it calls <code>/auth/session</code> once to refresh the token and retries the request automatically.</li>
+<li><strong><code>auth.tsx</code></strong>:</li>
+<li>Context provider (<code>AuthProvider</code>) and React hook (<code>useAuth()</code>). Maintains current user state, provides <code>login()</code>, <code>register()</code>, <code>logout()</code>, and <code>reload()</code> functions across the entire client-side tree.</li>
+<h4>Reusable UI Components (<code>src/components/</code>)</h4>
+<li><strong><code>Header.tsx</code></strong>: Fixed top navbar. Detects window scroll to apply a blurred frosted glass background (<code>.scrolled</code>). Displays navigation links and switches between "Login / Join Premium" and "Dashboard / Logout" based on auth state. Contains a mobile hamburger drawer.</li>
+<li><strong><code>Footer.tsx</code></strong>: Displays brand information, quick explore links, regulatory compliance placeholders (Investor Charter, Grievances, Smart ODR), and mandatory SEBI disclaimers.</li>
+<li><strong><code>Cards.tsx</code></strong>:</li>
+<li><code>AnalysisCard</code>: Renders an Elliott Wave analysis card. If user is premium, displays target, support, resistance, and stop-loss levels. If free, displays a locked prompt linking to pricing.</li>
+<li><code>BlogCard</code>: Renders a blog preview card with category pills and teaser text.</li>
+<li><code>VideoCard</code> & <code>VideoRow</code>: YouTube video display cards featuring thumbnail, title, and direct link to YouTube.</li>
+<li><code>Empty</code>: Visual placeholder for sections with no data.</li>
+<li><strong><code>WaveSketch.tsx</code></strong>: A responsive SVG generator that draws an illustrative 5-wave impulse or 3-wave correction diagram if an analysis doesn't have an uploaded chart image.</li>
+<li><strong><code>Plans.tsx</code></strong>: Displays free and premium subscription pricing tiers. Loads Razorpay's JavaScript SDK (<code>checkout.js</code>) dynamically, creates an order via <code>/api/payments/order</code>, opens the native Razorpay modal, and handles the post-payment verification callback.</li>
+<li><strong><code>Shell.tsx</code></strong>:</li>
+<li><code>Shell</code>: Unified sidebar layout for both <code>/dashboard</code> and <code>/admin</code> sections. Checks auth status and role; redirects unauthenticated visitors to <code>/login</code> and non-admins away from <code>/admin</code>.</li>
+<li><code>Lock</code>: Banner component indicating premium-only sections.</li>
+<li><strong><code>Spotlight.tsx</code></strong>: Adds a subtle mouse-following radial glow inside hovered cards using CSS variables (<code>--mx</code>, <code>--my</code>) on pointer movements.</li>
+<li><strong><code>Modal.tsx</code></strong>: Animated accessible pop-up dialog that supports clicking outside or pressing Escape to dismiss.</li>
+<li><strong><code>Notice.tsx</code></strong>: Floating toast notification for error messages or success alerts that auto-dismisses after 4 seconds.</li>
+<li><strong><code>Skeleton.tsx</code></strong>: Shimmer loading skeletons (<code>SkeletonCards</code>, <code>SkeletonTable</code>) displayed while data is being fetched.</li>
+<li><strong><code>Reveal.tsx</code></strong>: Wraps any element to smoothly slide and fade into view using an <code>IntersectionObserver</code> when scrolled into viewport. Honors user's <code>prefers-reduced-motion</code> settings.</li>
+<li><strong><code>SectionHead.tsx</code></strong>: Formats standardized section titles with small uppercase eyebrow text, main headings, accent highlights, and introductory lead paragraphs.</li>
+<h4>Application Pages (<code>src/app/</code>)</h4>
+<p>##### 1. Public Pages</p>
+<li><strong><code>page.tsx</code> (Homepage)</strong>: Server-rendered landing page showing the hero banner, market credibility statistics, featured Elliott Wave calls, educational theory Bento grid, latest blog articles, YouTube video showcase, mentorship perks, and pricing plans.</li>
+<li><strong><code>login/page.tsx</code> & <code>register/page.tsx</code></strong>: Clean authentication forms for logging in and creating accounts with input validation and error feedback.</li>
+<li><strong><code>pricing/page.tsx</code></strong>: Dedicated membership pricing page displaying plan cards and payment buttons.</li>
+<li><strong><code>analysis/page.tsx</code></strong>: Public gallery of market analyses across Indices, Derivatives, Commodities, and Forex.</li>
+<li><strong><code>blog/page.tsx</code> & <code>blog/[slug]/page.tsx</code></strong>: Blog index and single article page. On the single article page, if the post is locked, the reader sees the opening teaser and an upgrade card. If unlocked, the full HTML article is rendered.</li>
+<li><strong><code>videos/page.tsx</code></strong>: Archive of synced YouTube market breakdown videos.</li>
+<p>##### 2. Member Dashboard (<code>src/app/dashboard/</code>)</p>
+<li><strong><code>layout.tsx</code></strong>: Wraps all dashboard pages inside the <code>Shell</code> sidebar with links: Overview, Analysis, Weekly Blog, Mentorship, and Subscription.</li>
+<li><strong><code>page.tsx</code> (Overview)</strong>: Welcomes the user, displays their current plan status and expiry date, and showcases recent market updates.</li>
+<li><strong><code>analysis/page.tsx</code></strong>: Full analysis archive with unlocked premium levels.</li>
+<li><strong><code>blog/page.tsx</code></strong>: Member archive of weekly educational market blogs.</li>
+<li><strong><code>sessions/page.tsx</code></strong>: Upcoming live mentorship sessions where members can click to register and access meeting join links (Zoom/Google Meet).</li>
+<li><strong><code>billing/page.tsx</code></strong>: Displays active subscription details and a table of past invoices with tax breakdown (taxable amount + GST) and invoice numbers.</li>
+<p>##### 3. Admin Panel (<code>src/app/admin/</code>)</p>
+<li><strong><code>layout.tsx</code></strong>: Wraps admin sections with the <code>admin</code> flag passed to <code>Shell</code> (enforcing server-side and client-side admin checks).</li>
+<li><strong><code>page.tsx</code> (Overview)</strong>: Real-time platform statistics showing total revenue collected, total users, active premium subscribers, and published articles.</li>
+<li><strong><code>users/page.tsx</code></strong>: User management table with real-time search (name/email), status filter, and plan filter. Allows blocking/unblocking accounts and manually granting premium access via an interactive modal.</li>
+<li><strong><code>analysis/page.tsx</code></strong>: Form to publish new Elliott Wave calls or click "Post update" on existing ones (creating superseding version-controlled entries).</li>
+<li><strong><code>blog/page.tsx</code></strong>: Blog creation studio supporting immediate publishing, saving drafts, or scheduling for a future date/time.</li>
+<li><strong><code>sessions/page.tsx</code></strong>: Interface for creating live mentorship workshops, specifying start time, meeting link, and attendee capacity.</li>
+<li><strong><code>audit/page.tsx</code></strong>: Chronological audit trail showing every action performed by administrators.</li>
+<hr/>
+<h2>4. How the Database Tracks Everything</h2>
+<p>All database schemas are declared in <code>apps/api/src/models/index.ts</code>. Here is how MongoDB tracks the complete system state:</p>
+<h3>1. <code>User</code> Collection</h3>
+<p>Tracks user identity, authentication, authorization, and session invalidation.</p>
+<li>Fields: <code>name</code>, <code>email</code> (unique, lowercase), <code>passwordHash</code> (Argon2), <code>role</code> (<code>user</code> | <code>admin</code>), <code>status</code> (<code>active</code> | <code>blocked</code>), <code>tokenVersion</code> (number), <code>emailVerifiedAt</code>, <code>phone</code>, <code>phoneVerifiedAt</code>.</li>
+<li><strong>How it tracks state</strong>: Whenever an admin blocks a user (<code>status: 'blocked'</code>) or a user clicks "Logout from all devices", <code>tokenVersion</code> is incremented by 1. When the client attempts to use its refresh cookie, the token's embedded version doesn't match the database version, instantly killing the session.</li>
+<h3>2. <code>Plan</code> Collection</h3>
+<p>Tracks available pricing packages.</p>
+<li>Fields: <code>code</code> (e.g. <code>monthly</code>, <code>yearly</code>), <code>name</code>, <code>pricePaise</code> (integer paise, ₹999.00 = <code>99900</code>), <code>durationDays</code> (30 or 365), <code>active</code> (boolean).</li>
+<li><strong>How it tracks state</strong>: Storing money in paise prevents floating-point rounding errors. During checkout, prices are strictly read from the database, preventing client-side price tampering.</li>
+<h3>3. <code>Subscription</code> Collection</h3>
+<p>Tracks access rights and subscription timelines for every user.</p>
+<li>Fields: <code>user</code> (ref User), <code>plan</code> (ref Plan), <code>startsAt</code>, <code>endsAt</code>, <code>status</code> (<code>active</code> | <code>expired</code> | <code>cancelled</code>), <code>source</code> (<code>payment</code> | <code>admin</code>), <code>payment</code> (ref Payment).</li>
+<li><strong>How it tracks state</strong>:</li>
+<li>The compound index <code>{ user: 1, status: 1, endsAt: -1 }</code> enables instant checks to verify if a user has active premium rights:</li>
+<p>    <code>Subscription.exists({ user: userId, status: 'active', endsAt: { $gt: new Date() } })</code></p>
+<li><strong>Renewal stacking</strong>: If a user has 10 days remaining and buys another 30 days, <code>startsAt</code> is set to the <strong>existing</strong> subscription's <code>endsAt</code>, so the user gets 40 full consecutive days without losing any time.</li>
+<h3>4. <code>Payment</code> Collection</h3>
+<p>Tracks commercial transaction logs, Razorpay references, and GST splits.</p>
+<li>Fields: <code>user</code> (ref User), <code>plan</code> (ref Plan), <code>razorpayOrderId</code>, <code>razorpayPaymentId</code>, <code>amountPaise</code>, <code>taxablePaise</code>, <code>gstPaise</code>, <code>currency</code>, <code>status</code> (<code>created</code> | <code>paid</code> | <code>failed</code>), <code>invoiceNo</code>, <code>paidAt</code>.</li>
+<li><strong>How it tracks state</strong>: When an order is created, status starts as <code>'created'</code>. Once payment succeeds, status updates to <code>'paid'</code>, <code>paidAt</code> is set, and a sequential tax invoice is assigned.</li>
+<h3>5. <code>PaymentEvent</code> Collection (Webhook Idempotency)</h3>
+<p>Tracks raw webhook payloads received from Razorpay.</p>
+<li>Fields: <code>eventId</code> (unique from header), <code>type</code> (<code>payment.captured</code>), <code>payload</code> (raw JSON), <code>processed</code> (boolean).</li>
+<li><strong>How it tracks state</strong>: If Razorpay retries sending an event, the system checks <code>processed: true</code> and avoids duplicate charges or extensions.</li>
+<h3>6. <code>Counter</code> Collection</h3>
+<p>Provides atomic counters for business documents.</p>
+<li>Fields: <code>_id: "invoice"</code>, <code>seq: number</code>.</li>
+<li><strong>How it tracks state</strong>: Uses MongoDB's atomic <code>findByIdAndUpdate('invoice', { $inc: { seq: 1 } })</code> inside transactions so two simultaneous orders can never receive the same invoice number (e.g. <code>W4U-2026-00001</code>).</li>
+<h3>7. <code>Market</code> Collection</h3>
+<p>Stores tradable instruments (e.g., Nifty 50, Gold, Silver, Crude Oil, USD/INR) categorized by Index, Derivatives, Commodity, or Forex.</p>
+<h3>8. <code>Analysis</code> Collection</h3>
+<p>Tracks technical Elliott Wave research calls with <strong>immutable version history</strong>.</p>
+<li>Fields: <code>market</code>, <code>title</code>, <code>timeframe</code>, <code>waveCount</code>, <code>bias</code> (<code>Bullish</code> | <code>Bearish</code> | <code>Neutral</code>), <code>chartImageUrl</code>, <code>summary</code>, <code>levels</code> (support, resistance, target, stop loss, notes), <code>status</code> (<code>draft</code> | <code>published</code>), <code>publishedAt</code>, <code>supersedes</code>, <code>supersededBy</code>, <code>createdBy</code>.</li>
+<li><strong>How it tracks state</strong>: When an analyst revises an analysis, the system does <strong>not</strong> edit the existing document. It creates a brand-new document pointing to the old one (<code>supersedes</code>), and updates the old one's <code>supersededBy</code> pointer. Querying <code>{ status: 'published', supersededBy: null }</code> guarantees users only see the freshest call while maintaining a tamper-proof audit trail of previous market calls.</li>
+<h3>9. <code>BlogPost</code> Collection</h3>
+<p>Tracks weekly market articles with teaser and rich HTML body.</p>
+<li>Fields: <code>title</code>, <code>slug</code>, <code>market</code>, <code>teaser</code>, <code>body</code>, <code>status</code> (<code>draft</code> | <code>scheduled</code> | <code>published</code>), <code>publishAt</code>, <code>publishedAt</code>, <code>author</code>.</li>
+<li><strong>How it tracks state</strong>: If an article is set to <code>'scheduled'</code>, it stays invisible to visitors until <code>publishAt</code>. The background worker checks every 5 minutes for posts where <code>publishAt <= now</code> and flips them to <code>'published'</code>.</li>
+<h3>10. <code>MentorSession</code> Collection</h3>
+<p>Tracks live interactive mentorship sessions and attendee lists.</p>
+<li>Fields: <code>title</code>, <code>description</code>, <code>startsAt</code>, <code>joinLink</code> (premium only), <code>capacity</code>, <code>registrations</code> (array of user IDs).</li>
+<li><strong>How it tracks state</strong>: Uses atomic updates with condition <code>{ $size: '$registrations' } < capacity</code> to prevent overbooking.</li>
+<h3>11. <code>Video</code> Collection</h3>
+<p>Caches the advisory's YouTube video archive (video ID, title, thumbnail, publishedAt). Upserted by the background worker using RSS.</p>
+<h3>12. <code>AuditLog</code> Collection</h3>
+<p>An immutable record of all administrative activities (actor, action, target, metadata, timestamp) for regulatory audit and compliance.</p>
+<h3>13. <code>NotificationOutbox</code> Collection</h3>
+<p>Queues outbound emails, SMS, WhatsApp messages, or OTP verification codes asynchronously.</p>
+<hr/>
+<h2>5. Summary of Safety & Best Practices Implemented</h2>
+<p>1. <strong>Integer Money</strong>: All financial calculations use integer paise to eliminate rounding discrepancies.</p>
+<p>2. <strong>First-Party Cookies</strong>: Next.js reverse proxy forwards API calls so cookies never face third-party browser restrictions.</p>
+<p>3. <strong>Argon2 Password Hashing</strong>: Modern, memory-hard hashing resistant to GPU cracking.</p>
+<p>4. <strong>Instant Logout Everywhere</strong>: <code>tokenVersion</code> in the user model invalidates all active sessions in one database write.</p>
+<p>5. <strong>Double Payment Safety</strong>: Fast-path verification unlocks the UI instantly; the asynchronous webhook acts as the permanent source of truth.</p>
+<p>6. <strong>Zero Client-Side Leaks</strong>: Non-premium visitors never receive locked content in network payloads.</p>
+<p>7. <strong>Versioned Analyses</strong>: Market calls cannot be quietly modified after the fact; changes create new superseding records.</p>
+<p>8. <strong>Automated Maintenance</strong>: Background worker handles expiration, YouTube updates, and scheduled publications automatically.</p>
+</body>
+</html>

@@ -1,0 +1,44 @@
+# Whole stack in containers (production-style). NOT tested in the build sandbox, so try it on a staging box first.
+# Before: copy apps/api/.env.example to apps/api/.env and fill it in.
+services:
+  mongo:
+    image: mongo:7
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    volumes: [mongo-data:/data/db]
+    healthcheck:
+      test: >
+        mongosh --quiet --eval "try{rs.status().ok}catch(e){rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}).ok}"
+      interval: 5s
+      retries: 20
+  api:
+    build: ./apps/api
+    env_file: ./apps/api/.env
+    environment:
+      MONGO_URI: mongodb://mongo:27017/waves4u?replicaSet=rs0
+      CLIENT_URL: http://localhost:3000
+      # Set INTERNAL_API_KEY in a .env file next to this compose file; api and web must share it.
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+    depends_on: { mongo: { condition: service_healthy } }
+    restart: unless-stopped
+  worker:
+    build: ./apps/api
+    command: ["node", "dist/worker.js"]
+    volumes: [backups:/app/backups]   # daily mongodump archives; sync this folder off-site
+    env_file: ./apps/api/.env
+    environment:
+      MONGO_URI: mongodb://mongo:27017/waves4u?replicaSet=rs0
+    depends_on: { mongo: { condition: service_healthy } }
+    restart: unless-stopped
+  web:
+    build:
+      context: ./apps/web
+      args: { API_URL: "http://api:4000" }
+    environment:
+      API_URL: http://api:4000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+    ports: ["3000:3000"]
+    depends_on: [api]
+    restart: unless-stopped
+volumes:
+  mongo-data:
+  backups:

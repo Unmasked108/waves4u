@@ -1,0 +1,15 @@
+{
+  "name": "waves4u",
+  "private": true,
+  "description": "Convenience scripts. apps/api and apps/web are independent projects.",
+  "scripts": {
+    "setup": "npm --prefix apps/api install && npm --prefix apps/web install",
+    "db": "docker compose -f apps/api/docker-compose.yml up -d mongo",
+    "seed": "npm --prefix apps/api run seed",
+    "dev:api": "npm --prefix apps/api run dev",
+    "dev:worker": "npm --prefix apps/api run worker",
+    "dev:web": "npm --prefix apps/web run dev",
+    "seed:demo": "npm --prefix apps/api run seed:demo",
+    "unseed:demo": "npm --prefix apps/api run unseed:demo"
+  }
+}

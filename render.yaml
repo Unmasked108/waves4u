@@ -1,0 +1,66 @@
+# Render Blueprint for the STAGING backend (free plan, for client review).
+# Render dashboard > New > Blueprint > pick this repo. Values marked sync:false are asked for on first deploy.
+# Production uses docker-compose.yml instead (separate API + worker + backups). See docs/DEPLOY_STAGING.md.
+services:
+  - type: web
+    name: waves4u-api
+    runtime: node
+    plan: free
+    region: singapore            # closest Render region to India
+    rootDir: apps/api
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+      # Free plan has one service, so the scheduled jobs run inside the API.
+      - key: RUN_JOBS
+        value: "true"
+      # mongodump is not available here; Atlas keeps the data.
+      - key: BACKUP_ENABLED
+        value: "false"
+      # Requests arrive through Vercel's proxy and Render's load balancer.
+      - key: TRUST_PROXY
+        value: "true"
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: ADMIN_2FA_REQUIRED
+        value: "true"
+      - key: SINGLE_SESSION
+        value: "true"
+      - key: MONGO_URI               # Atlas connection string (mongodb+srv://...)
+        sync: false
+      - key: CLIENT_URL              # https://<your-project>.vercel.app
+        sync: false
+      - key: INTERNAL_API_KEY        # same value as on Vercel
+        sync: false
+      - key: RAZORPAY_KEY_ID         # TEST keys (rzp_test_...)
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: SMTP_HOST
+        value: smtp-relay.brevo.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM               # must be a sender verified in Brevo
+        sync: false
+      - key: TEAM_EMAIL
+        sync: false
+      - key: TURNSTILE_SECRET
+        sync: false
+      - key: YOUTUBE_CHANNEL_ID
+        sync: false
+      - key: COMPANY_STATE
+        value: Gujarat
